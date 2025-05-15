@@ -1,0 +1,772 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RideIndia - Take Our Survey</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            line-height: 1.6;
+            overflow-x: hidden;
+            margin: 0;
+        }
+        body.survey-active {
+            overflow: hidden;
+        }
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+        .header {
+            position: sticky;
+            top: 0;
+            background: rgba(10, 10, 10, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            padding: 16px 0;
+        }
+        .header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+        .header nav a {
+            font-size: 16px;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 24px;
+            transition: background 0.3s ease, transform 0.3s ease;
+        }
+        .header nav a:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+        .hero-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: linear-gradient(135deg, #1e1e1e 0%, #0a0a0a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, rgba(99, 102, 241, 0.2) 0%, transparent 70%);
+            z-index: -1;
+        }
+        .hero-content {
+            max-width: 800px;
+            padding: 24px;
+        }
+        .hero-content .animate-hero-title {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 16px;
+            color: #ffffff;
+            opacity: 1;
+            display: block;
+        }
+        .hero-content .animate-hero-title span {
+            display: inline-block;
+            opacity: 0;
+        }
+        .hero-content .animate-hero-text {
+            font-size: 20px;
+            font-weight: 400;
+            color: #d1d5db;
+            margin-bottom: 32px;
+            opacity: 1;
+        }
+        .btn {
+            display: inline-block;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            color: #ffffff;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+        }
+        .survey-section {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a0a;
+            overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            display: none;
+        }
+        .survey-section.active {
+            display: flex;
+        }
+        .survey-container {
+            max-width: 600px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 80vh;
+        }
+        .survey-container h2 {
+            font-size: 32px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 32px;
+            color: #ffffff;
+        }
+        .survey-group {
+            margin-bottom: 32px;
+            display: none;
+        }
+        .survey-group.active {
+            display: block;
+            opacity: 1 !important;
+        }
+        .survey-group label {
+            display: block;
+            font-size: 16px;
+            font-weight: 500;
+            color: #d1d5db;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+        .survey-group.active .radio-group {
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+        .option-container {
+            border: 2px solid transparent;
+            border-image: linear-gradient(45deg, #6366f1, #a855f7) 1;
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 80%;
+            max-width: 400px;
+            transition: box-shadow 0.3s ease, background 0.3s ease;
+            opacity: 1 !important;
+            cursor: pointer;
+        }
+        @keyframes hoverglow {
+            0%, 100% { 
+                box-shadow: 0 0 8px 2px rgba(99, 102, 241, 0.3), 0 0 16px 3px rgba(168, 85, 247, 0.2); 
+            }
+            50% { 
+                box-shadow: 0 0 12px 3px rgba(99, 102, 241, 0.5), 0 0 24px 6px rgba(168, 85, 247, 0.4); 
+            }
+        }
+        .option-container:hover {
+            background: rgba(99, 102, 241, 0.05);
+            animation: hoverglow 1.2s ease-in-out infinite;
+        }
+        @keyframes backglow {
+            0%, 100% { 
+                box-shadow: 0 0 10px 2px rgba(99, 102, 241, 0.4), 0 0 20px 4px rgba(168, 85, 247, 0.3); 
+            }
+            50% { 
+                box-shadow: 0 0 15px 4px rgba(99, 102, 241, 0.6), 0 0 30px 8px rgba(168, 85, 247, 0.5); 
+            }
+        }
+        .option-container:has(input:checked) {
+            background: rgba(99, 102, 241, 0.1);
+            animation: backglow 1.5s ease-in-out infinite;
+        }
+        .survey-group input[type="radio"] {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 0;
+            height: 0;
+            margin: 0;
+            opacity: 0;
+            position: absolute;
+        }
+        .option-container label {
+            font-size: 16px;
+            font-weight: 500;
+            color: #ffffff;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            padding: 8px 0;
+        }
+        .survey-group.hidden {
+            display: none;
+        }
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            width: 80%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            font-family: 'Inter', sans-serif;
+        }
+        .nav-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+        }
+        .nav-btn:disabled {
+            background: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+            color: #6b7280;
+        }
+        .nav-btn.hidden {
+            visibility: hidden;
+        }
+        #confirmation-message {
+            display: none;
+            background: #10b981;
+            color: #ffffff;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 24px;
+            font-weight: 500;
+            font-family: 'Inter', sans-serif;
+            width: 80%;
+            max-width: 400px;
+            margin: 24px auto 0;
+        }
+        .footer {
+            padding: 40px 0;
+            background: #0a0a0a;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .footer p {
+            font-size: 14px;
+            font-weight: 400;
+            color: #d1d5db;
+            margin-bottom: 8px;
+        }
+        .footer a {
+            color: #a855f7;
+            transition: color 0.3s ease;
+        }
+        .footer a:hover {
+            color: #6366f1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="logo animate-header-logo">RideIndia</div>
+            <nav>
+                <a href="#survey" class="animate-header-link">Take the Survey</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero-section">
+        <div class="hero-content">
+            <h1 class="animate-hero-title">Frustrated with Ola, Rapido, or Uber?</h1>
+            <p class="animate-hero-text">RideIndia is here to hear your complaints and improve your ride experience.</p>
+            <a href="#survey" class="btn animate-hero-btn">Take the Survey</a>
+        </div>
+    </section>
+
+    <!-- Survey Section -->
+    <section id="survey" class="survey-section">
+        <div class="survey-container">
+            <h2 class="animate-survey-title">RideIndia Survey</h2>
+            <form id="survey-form" method="POST">
+                <!-- Question 1 -->
+                <div class="survey-group" data-page="1">
+                    <label>Have you ever faced delays or ride cancellations while using ride hailing services (e.g., Ola, Uber, Rapido etc)?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="delays-yes" name="Delays" value="Yes">
+                            <label for="delays-yes">Yes</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="delays-no" name="Delays" value="No">
+                            <label for="delays-no">No</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 2 -->
+                <div class="survey-group" data-page="2">
+                    <label>How satisfied are you with the condition and cleanliness of the vehicles used on ride hailing services?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="vehicle-very-satisfied" name="Vehicle Condition" value="Very satisfied">
+                            <label for="vehicle-very-satisfied">Very satisfied</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="vehicle-satisfied" name="Vehicle Condition" value="Satisfied">
+                            <label for="vehicle-satisfied">Satisfied</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="vehicle-neutral" name="Vehicle Condition" value="Neutral">
+                            <label for="vehicle-neutral">Neutral</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="vehicle-dissatisfied" name="Vehicle Condition" value="Dissatisfied">
+                            <label for="vehicle-dissatisfied">Dissatisfied</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="vehicle-very-dissatisfied" name="Vehicle Condition" value="Very dissatisfied">
+                            <label for="vehicle-very-dissatisfied">Very dissatisfied</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 3 -->
+                <div class="survey-group" data-page="3">
+                    <label>Have you encountered any issues with the behavior or professionalism of the drivers?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="driver-yes" name="Driver Behavior" value="Yes">
+                            <label for="driver-yes">Yes</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="driver-no" name="Driver Behavior" value="No">
+                            <label for="driver-no">No</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 4 -->
+                <div class="survey-group" data-page="4">
+                    <label>Do you think the pricing on ride hailing apps are fair, or do you often experience frequent surge pricing?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="pricing-fair" name="Pricing" value="Fair pricing">
+                            <label for="pricing-fair">Fair pricing</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="pricing-surge" name="Pricing" value="Frequently surge pricing">
+                            <label for="pricing-surge">Frequently surge pricing</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="pricing-sometimes" name="Pricing" value="Sometimes">
+                            <label for="pricing-sometimes">Sometimes</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 5 -->
+                <div class="survey-group" data-page="5">
+                    <label>How easy do you find the ride booking process on these apps?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="booking-very-easy" name="Booking Process" value="Very easy">
+                            <label for="booking-very-easy">Very easy</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="booking-easy" name="Booking Process" value="Easy">
+                            <label for="booking-easy">Easy</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="booking-neutral" name="Booking Process" value="Neutral">
+                            <label for="booking-neutral">Neutral</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="booking-difficult" name="Booking Process" value="Difficult">
+                            <label for="booking-difficult">Difficult</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="booking-very-difficult" name="Booking Process" value="Very difficult">
+                            <label for="booking-very-difficult">Very difficult</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 6 -->
+                <div class="survey-group" data-page="6">
+                    <label>Would you like to see more vehicle options (e.g., electric rickshaws, trucks) for different types of rides?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="vehicle-options-yes" name="Vehicle Options" value="Yes">
+                            <label for="vehicle-options-yes">Yes</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="vehicle-options-no" name="Vehicle Options" value="No">
+                            <label for="vehicle-options-no">No</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 7 -->
+                <div class="survey-group" data-page="7">
+                    <label>How confident do you feel in terms of safety while using online ride hailing services?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="safety-very-confident" name="Safety" value="Very confident">
+                            <label for="safety-very-confident">Very confident</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="safety-confident" name="Safety" value="Confident">
+                            <label for="safety-confident">Confident</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="safety-neutral" name="Safety" value="Neutral">
+                            <label for="safety-neutral">Neutral</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="safety-not-confident" name="Safety" value="Not confident">
+                            <label for="safety-not-confident">Not confident</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="safety-very-unsafe" name="Safety" value="Very unsafe">
+                            <label for="safety-very-unsafe">Very unsafe</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 8 -->
+                <div class="survey-group" data-page="8">
+                    <label>If a new ride-hailing app could offer better service, pricing, and more reliable rides, would you be interested in trying it out?</label>
+                    <div class="radio-group">
+                        <div class="option-container">
+                            <input type="radio" id="new-app-yes" name="New App" value="Yes">
+                            <label for="new-app-yes">Yes</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="new-app-no" name="New App" value="No">
+                            <label for="new-app-no">No</label>
+                        </div>
+                        <div class="option-container">
+                            <input type="radio" id="new-app-maybe" name="New App" value="Maybe">
+                            <label for="new-app-maybe">Maybe</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="navigation">
+                    <button type="button" id="prev-btn" class="nav-btn hidden">Previous</button>
+                    <button type="button" id="next-btn" class="nav-btn">Next</button>
+                </div>
+            </form>
+            <div id="confirmation-message" class="animate-confirmation">Thank you for completing the survey! Your feedback will help improve ride-hailing services.</div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="animate-footer-text">© 2025 RideIndia. All rights reserved.</p>
+            <p class="animate-footer-text">Contact us: <a href="mailto:support@rideindia.com">support@rideindia.com</a></p>
+        </div>
+    </footer>
+
+    <script type="module">
+      // Import Firebase SDKs
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
+      import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+
+      // Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyAFvkgG4kjiOxh6lJXk2-eOBre0OIBcaoQ",
+        authDomain: "rideindia-9db37.firebaseapp.com",
+        projectId: "rideindia-9db37",
+        storageBucket: "rideindia-9db37.firebasestorage.app",
+        messagingSenderId: "141782609409",
+        appId: "1:141782609409:web:af32e22aafd306641d1a00",
+        measurementId: "G-TTY259PPMM"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // Register ScrollTrigger plugin
+      gsap.registerPlugin(ScrollTrigger);
+
+      // Smooth scroll to survey section
+      document.querySelectorAll('a[href="#survey"]').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const surveySection = document.querySelector('#survey');
+          surveySection.classList.add('active');
+          document.body.classList.add('survey-active');
+          showPage(currentPage);
+        });
+      });
+
+      // Hero Section Typography Animation
+      const heroTitle = document.querySelector('.animate-hero-title');
+      if (heroTitle) {
+        const text = heroTitle.textContent;
+        heroTitle.innerHTML = text
+          .split('')
+          .map(char => `<span style="display: inline-block; opacity: 0;">${char === ' ' ? ' ' : char}</span>`)
+          .join('');
+        const spans = heroTitle.querySelectorAll('span');
+        gsap.to(spans, {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          stagger: 0.03,
+          ease: 'power3.out',
+          delay: 0.2
+        });
+      }
+
+      // Survey Logic
+      const form = document.getElementById('survey-form');
+      const surveySection = document.getElementById('survey');
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const confirmation = document.getElementById('confirmation-message');
+      let currentPage = 1;
+      const totalPages = 8;
+      const responses = {};
+
+      const delaysRadios = document.getElementsByName('Delays');
+      const driverRadios = document.getElementsByName('Driver Behavior');
+      const vehicleOptionsRadios = document.getElementsByName('Vehicle Options');
+
+      // Make option-container clickable
+      document.querySelectorAll('.option-container').forEach(container => {
+        container.addEventListener('click', (e) => {
+          const input = container.querySelector('input[type="radio"]');
+          if (input && e.target !== input) {
+            document.querySelectorAll(`input[name="${input.name}"]`).forEach(radio => {
+              radio.checked = false;
+            });
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+      });
+
+      function showPage(page) {
+        currentPage = page;
+        document.querySelectorAll('.survey-group').forEach(group => {
+          group.classList.toggle('active', parseInt(group.dataset.page) === page);
+        });
+
+        prevBtn.classList.toggle('hidden', page === 1);
+        nextBtn.textContent = page === totalPages ? 'Submit' : 'Next';
+        validatePage();
+
+        const currentGroup = document.querySelector(`.survey-group[data-page="${page}"]`);
+        gsap.set(currentGroup, { opacity: 0, scale: 1, x: 0, y: 0, rotate: 0 });
+        if (page === 1) {
+          gsap.to(currentGroup, { opacity: 1, scale: 1.05, duration: 0.5, ease: 'power2.out', force3D: true });
+        } else if (page === 2) {
+          gsap.to(currentGroup, { opacity: 1, rotate: 0, duration: 0.6, ease: 'power3.out', force3D: true, onStart: () => { gsap.set(currentGroup, { rotate: 5 }); } });
+        } else if (page === 3) {
+          gsap.to(currentGroup, { opacity: 1, x: 0, duration: 0.5, ease: 'power2.out', force3D: true, onStart: () => { gsap.set(currentGroup, { x: -50 }); } });
+        } else if (page === 4) {
+          gsap.to(currentGroup, { opacity: 1, scaleY: 1, duration: 0.5, ease: 'power2.out', force3D: true, onStart: () => { gsap.set(currentGroup, { scaleY: 0.8 }); } });
+        } else if (page === 5) {
+          gsap.to(currentGroup, { opacity: 1, scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.5)', force3D: true, onStart: () => { gsap.set(currentGroup, { scale: 0.9 }); } });
+        } else if (page === 6) {
+          gsap.to(currentGroup, { opacity: 1, scale: 1.05, duration: 0.5, ease: 'power2.out', force3D: true });
+        } else if (page === 7) {
+          gsap.to(currentGroup, { opacity: 1, rotate: 0, duration: 0.6, ease: 'power3.out', force3D: true, onStart: () => { gsap.set(currentGroup, { rotate: 10 }); } });
+        } else if (page === 8) {
+          gsap.to(currentGroup, { opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.7)', force3D: true, onStart: () => { gsap.set(currentGroup, { scale: 0.8 }); } });
+        }
+
+        setTimeout(() => {
+          currentGroup.style.opacity = '1';
+          currentGroup.querySelectorAll('.option-container').forEach(el => {
+            el.style.opacity = '1';
+            el.style.visibility = 'visible';
+          });
+        }, 600);
+      }
+
+      function validatePage() {
+        nextBtn.disabled = false; // Always enable Next
+      }
+
+      function saveResponses() {
+        responses.delays = form.querySelector('input[name="Delays"]:checked')?.value || '';
+        responses.vehicleCondition = form.querySelector('input[name="Vehicle Condition"]:checked')?.value || '';
+        responses.driverBehavior = form.querySelector('input[name="Driver Behavior"]:checked')?.value || '';
+        responses.pricing = form.querySelector('input[name="Pricing"]:checked')?.value || '';
+        responses.bookingProcess = form.querySelector('input[name="Booking Process"]:checked')?.value || '';
+        responses.vehicleOptions = form.querySelector('input[name="Vehicle Options"]:checked')?.value || '';
+        responses.safety = form.querySelector('input[name="Safety"]:checked')?.value || '';
+        responses.newApp = form.querySelector('input[name="New App"]:checked')?.value || '';
+        console.log('Collected responses:', responses);
+      }
+
+      // Navigation
+      prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+          showPage(currentPage - 1);
+        }
+      });
+
+      nextBtn.addEventListener('click', () => {
+        saveResponses();
+        if (currentPage < totalPages) {
+          showPage(currentPage + 1);
+        } else {
+          const formData = {
+            'Delyas': responses.delays,
+            'Vehicle condition': responses.vehicleCondition,
+            'Problem with driver behavior': responses.driverBehavior,
+            'Pricing': responses.pricing,
+            'Booking process': responses.bookingProcess,
+            'Vehicle option': responses.vehicleOptions,
+            'Safety': responses.safety,
+            'New app': responses.newApp
+          };
+
+          // Remove empty fields
+          Object.keys(formData).forEach(key => {
+            if (formData[key] === '' || formData[key] === undefined) {
+              delete formData[key];
+            }
+          });
+
+          console.log('Sending to Firestore:', formData);
+
+          // Save to Firestore
+          addDoc(collection(db, 'survey_responses'), formData)
+            .then(docRef => {
+              console.log('Submission saved:', docRef.id);
+              surveySection.classList.remove('active');
+              document.body.classList.remove('survey-active');
+              confirmation.style.display = 'block';
+              gsap.fromTo(confirmation, 
+                { opacity: 0, y: 20 },
+                { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }
+              );
+              form.reset();
+              currentPage = 1;
+              setTimeout(() => {
+                confirmation.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }, 5000);
+            })
+            .catch(error => {
+              console.error('Firestore error:', error);
+              alert(`Failed to submit survey: ${error.message}. Check console or email support@rideindia.com.`);
+            });
+        }
+      });
+
+      // Event Listeners
+      delaysRadios.forEach(radio => radio.addEventListener('change', validatePage));
+      driverRadios.forEach(radio => radio.addEventListener('change', validatePage));
+      vehicleOptionsRadios.forEach(radio => radio.addEventListener('change', validatePage));
+      form.querySelectorAll('input[type="radio"]').forEach(radio => radio.addEventListener('change', validatePage));
+
+      // Debug form submission
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        console.log('Form data:', responses);
+      });
+    </script>
+</body>
+</html>
